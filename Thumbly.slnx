@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Thumbly.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Thumbly.Tests.csproj" />
+  </Folder>
+</Solution>
