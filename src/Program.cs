@@ -8,13 +8,24 @@ namespace Thumbly
         [STAThread]
         private static int Main(string[] args)
         {
+            // "--folder <path>": launched from Explorer's folder right-click menu; opens with that folder armed.
+            int fi = Array.IndexOf(args, "--folder");
+            if (fi >= 0)
+                return RunWindow(fi + 1 < args.Length ? args[fi + 1] : "");
+
             // Headless mode: files dropped onto Thumbly.exe (or passed via "Send to") are converted without a window.
             if (args.Length > 0)
                 return RunHeadless(args);
 
+            return RunWindow(null);
+        }
+
+        private static int RunWindow(string armedFolder)
+        {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
+            try { ShellIntegration.RepairIfMoved(Application.ExecutablePath); } catch { } // keep the menu entry pointing at this exe
+            Application.Run(new MainForm(armedFolder));
             return 0;
         }
 

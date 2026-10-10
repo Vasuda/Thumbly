@@ -118,6 +118,55 @@ namespace Thumbly.Tests
         }
 
         [Fact]
+        public void Settings_round_trip_folder_keys_and_old_files_get_defaults()
+        {
+            var path = Path.Combine(_root, "s2.txt");
+            var s = Settings.CreateDefault();
+            s.ContextMenu = true;
+            s.AlwaysEdit = true;
+            s.AutoSet = true;
+            s.WindowSize = new Size(900, 600);
+            s.MattingModelPath = @"D:\Models\Matting\birefnet-lite.onnx";
+            s.Save(path);
+            var l = Settings.Load(path);
+            Assert.True(l.ContextMenu);
+            Assert.True(l.AlwaysEdit);
+            Assert.True(l.AutoSet);
+            Assert.Equal(new Size(900, 600), l.WindowSize);
+            Assert.Equal(@"D:\Models\Matting\birefnet-lite.onnx", l.MattingModelPath);
+
+            var old = Path.Combine(_root, "old.txt");
+            File.WriteAllLines(old, new[] { "SaveImageCopy=false", "WindowSize=junk", "FoldersViewSize=1,1" });
+            var o = Settings.Load(old);
+            Assert.False(o.ContextMenu);
+            Assert.False(o.AlwaysEdit);
+            Assert.False(o.AutoSet);
+            Assert.Equal(Settings.DefaultWindowSize, o.WindowSize);
+
+            var first = Path.Combine(_root, "first.txt"); // the first folder-icon version called it AdjustBeforeApply
+            File.WriteAllLines(first, new[] { "AdjustBeforeApply=true" });
+            Assert.True(Settings.Load(first).AlwaysEdit);
+        }
+
+        [Fact]
+        public void ConvertSource_applies_the_crop_and_keeps_one_copy()
+        {
+            var src = MakePng("wide.png", 100, 50);
+            var s = MakeSettings();
+            var r = Converter.ConvertSource(new IconSource { ImagePath = src, Crop = new RectangleF(0, 0, 0.5f, 1f) }, s);
+            Assert.Equal("wide.ico", Path.GetFileName(r.IconPath));
+            Assert.Equal(Path.Combine(_root, "images", "wide.png"), r.ImagePath);
+
+            // an image already in the image folder is not copied again
+            var again = Converter.ConvertSource(new IconSource { ImagePath = r.ImagePath }, s);
+            Assert.Equal(r.ImagePath, again.ImagePath);
+            Assert.Single(Directory.GetFiles(Path.Combine(_root, "images")));
+
+            using (var frame = IcoWriter.LoadFrame(r.IconPath, 256))
+                Assert.Equal(255, frame.GetPixel(2, 128).A); // cropped to a square: no transparent padding at the left edge
+        }
+
+        [Fact]
         public void Settings_missing_file_gives_defaults()
         {
             var s = Settings.Load(Path.Combine(_root, "nope.txt"));

@@ -66,9 +66,13 @@ namespace Thumbly
             return bmp;
         }
 
-        public static Bitmap Resize(Image square, int size)
+        public static Bitmap Resize(Image square, int size) =>
+            DrawScaled(square, new Rectangle(0, 0, square.Width, square.Height), size, size);
+
+        /// <summary>Draws srcRect of the source into a new 32bpp bitmap of the given size with high-quality resampling.</summary>
+        public static Bitmap DrawScaled(Image source, Rectangle srcRect, int width, int height)
         {
-            var bmp = new Bitmap(size, size, PixelFormat.Format32bppArgb);
+            var bmp = new Bitmap(width, height, PixelFormat.Format32bppArgb);
             using (var g = Graphics.FromImage(bmp))
             {
                 g.CompositingMode = CompositingMode.SourceCopy;
@@ -79,10 +83,44 @@ namespace Thumbly
                 using (var attrs = new ImageAttributes())
                 {
                     attrs.SetWrapMode(WrapMode.TileFlipXY); // avoids the half-pixel edge halo GDI+ otherwise produces
-                    g.DrawImage(square, new Rectangle(0, 0, size, size), 0, 0, square.Width, square.Height, GraphicsUnit.Pixel, attrs);
+                    g.DrawImage(source, new Rectangle(0, 0, width, height), srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height, GraphicsUnit.Pixel, attrs);
                 }
             }
             return bmp;
+        }
+
+        /// <summary>
+        /// Reads the layer closest to <paramref name="size"/> (preferring larger) from an .ico as a bitmap, or null when
+        /// the file cannot be read. PNG layers are decoded directly; anything else goes through System.Drawing.Icon.
+        /// </summary>
+        public static Bitmap LoadFrame(string path, int size)
+        {
+            try
+            {
+                var d = File.ReadAllBytes(path);
+                if (d.Length < 6 || BitConverter.ToUInt16(d, 2) != 1) return null;
+                int n = BitConverter.ToUInt16(d, 4), best = -1, bestDim = 0;
+                for (int i = 0; i < n && 6 + 16 * i + 16 <= d.Length; i++)
+                {
+                    int dim = d[6 + 16 * i] == 0 ? 256 : d[6 + 16 * i];
+                    bool better = best < 0
+                        || (dim >= size && (bestDim < size || dim < bestDim))
+                        || (dim < size && bestDim < size && dim > bestDim);
+                    if (better) { best = i; bestDim = dim; }
+                }
+                if (best < 0) return null;
+                int o = 6 + 16 * best;
+                int len = BitConverter.ToInt32(d, o + 8), off = BitConverter.ToInt32(d, o + 12);
+                if (off < 0 || len <= 8 || off + len > d.Length) return null;
+                bool png = d[off] == 0x89 && d[off + 1] == (byte)'P' && d[off + 2] == (byte)'N' && d[off + 3] == (byte)'G';
+                if (png)
+                    using (var ms = new MemoryStream(d, off, len))
+                    using (var img = Image.FromStream(ms))
+                        return new Bitmap(img);
+                using (var icon = new Icon(path, size, size))
+                    return icon.ToBitmap();
+            }
+            catch { return null; }
         }
 
         private static IEnumerable<int> Distinct(IEnumerable<int> sizes)

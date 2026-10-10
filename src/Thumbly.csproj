@@ -12,5 +12,18 @@
     <Version>1.0.0</Version>
     <Product>Thumbly</Product>
     <Description>Drag an image in, get a Windows .ico out.</Description>
+    <!-- 64-bit only: the ONNX Runtime native library used for AI background removal ships for x64. -->
+    <PlatformTarget>x64</PlatformTarget>
+    <!-- ONNX Runtime pulls in System.Memory and friends whose versions disagree; redirect them to one version. -->
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- AI background removal. Only loaded when that feature is used; the exe runs without these DLLs. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.29.0" />
+    <!-- Newer than the one ONNX Runtime asks for, so the app and the test host agree on one version (with redirects). -->
+    <PackageReference Include="System.Memory" Version="4.6.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Thumbly.Tests" />
+  </ItemGroup>
 </Project>
